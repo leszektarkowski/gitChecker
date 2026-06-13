@@ -1,6 +1,7 @@
 //! HTTP API (axum). Read-only status endpoints plus manual triggers for the
 //! background scan/check loops.
 
+use crate::config::Config;
 use crate::db::Db;
 use crate::model::Summary;
 use axum::{
@@ -11,14 +12,13 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tokio::sync::Notify;
 
 /// Shared state handed to every request.
 #[derive(Clone)]
 pub struct AppState {
     pub db: Db,
-    /// Wake the discovery loop (POST /scan).
-    pub scan_notify: Arc<Notify>,
+    /// Config, for the scan roots used by `POST /scan`.
+    pub cfg: Arc<Config>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -56,14 +56,20 @@ async fn get_repo(
     }
 }
 
+/// Synchronously re-discover repos under the configured roots, then check them,
+/// and return once done — so a client that POSTs here can immediately GET the
+/// updated list including any newly found repos.
 async fn trigger_scan(State(state): State<AppState>) -> StatusCode {
-    state.scan_notify.notify_one();
-    StatusCode::ACCEPTED
+    if let Err(e) = crate::run_scan(&state.db, &state.cfg).await {
+        tracing::error!(error = %e, "manual scan failed");
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
+    crate::check_all(&state.db).await;
+    StatusCode::OK
 }
 
 /// Synchronously re-inspect every repo and return once done, so a client that
-/// POSTs here can immediately GET fresh status. (Contrast `/scan`, which stays
-/// fire-and-forget.)
+/// POSTs here can immediately GET fresh status.
 async fn trigger_check(State(state): State<AppState>) -> StatusCode {
     crate::check_all(&state.db).await;
     StatusCode::OK

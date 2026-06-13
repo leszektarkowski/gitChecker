@@ -126,4 +126,8 @@ launchctl load ~/Library/LaunchAgents/com.user.gitchecker.plist
 launchctl unload ~/Library/LaunchAgents/com.user.gitchecker.plist
 ```
 
+## License
+
+[MIT](LICENSE) — do whatever you like, just keep the copyright notice.
+
 [git2-rs]: https://github.com/rust-lang/git2-rs

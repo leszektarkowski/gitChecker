@@ -36,7 +36,6 @@ async fn main() -> Result<()> {
 
     let db = Db::open(&config::db_path()?)?;
 
-    let scan_notify = Arc::new(Notify::new());
     let check_notify = Arc::new(Notify::new());
     let fetch_notify = Arc::new(Notify::new());
 
@@ -44,7 +43,6 @@ async fn main() -> Result<()> {
     tokio::spawn(scan_loop(
         db.clone(),
         cfg.clone(),
-        scan_notify.clone(),
         check_notify.clone(),
         fetch_notify.clone(),
     ));
@@ -63,7 +61,7 @@ async fn main() -> Result<()> {
     // HTTP server.
     let state = AppState {
         db,
-        scan_notify,
+        cfg: cfg.clone(),
     };
     let listener = tokio::net::TcpListener::bind(cfg.listen_addr).await?;
     tracing::info!(addr = %cfg.listen_addr, "API listening");
@@ -71,20 +69,17 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Discovery loop: re-scan on the configured interval or when notified.
+/// Discovery loop: re-scan on the configured interval. (Manual scans go through
+/// the synchronous `POST /scan` endpoint instead.)
 async fn scan_loop(
     db: Db,
     cfg: Arc<Config>,
-    scan_notify: Arc<Notify>,
     check_notify: Arc<Notify>,
     fetch_notify: Arc<Notify>,
 ) {
     let mut ticker = interval(cfg.scan_interval());
     loop {
-        tokio::select! {
-            _ = ticker.tick() => {}
-            _ = scan_notify.notified() => {}
-        }
+        ticker.tick().await;
         if let Err(e) = run_scan(&db, &cfg).await {
             tracing::warn!(error = %e, "scan failed");
         }
@@ -96,7 +91,9 @@ async fn scan_loop(
     }
 }
 
-async fn run_scan(db: &Db, cfg: &Config) -> Result<()> {
+/// Discover repos under the configured roots, upsert them, and prune any that
+/// disappeared from disk. Shared by the periodic loop and `POST /scan`.
+pub async fn run_scan(db: &Db, cfg: &Config) -> Result<()> {
     let roots = cfg.resolved_scan_roots();
     let excludes = cfg.scan_excludes.clone();
     let found = tokio::task::spawn_blocking(move || scan::discover(&roots, &excludes)).await?;

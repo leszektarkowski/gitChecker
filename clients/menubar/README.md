@@ -24,7 +24,14 @@ The menu bar item shows:
 
 **Clicking a repo opens Terminal at its folder** (`open -a Terminal <path>`).
 
-It polls `GET /summary` and `GET /repos` every 30s; **Refresh** forces an update.
+It polls every 30s. The footer has two actions:
+
+- **Refresh** — re-check the status of *known* repos (picks up a repo you just
+  cleaned or changed). Backed by the synchronous `POST /check`.
+- **Rescan** — re-discover repo folders under the configured roots: finds repos
+  added since the last scan and prunes ones that are gone. Backed by the
+  synchronous `POST /scan`. Shows "scanning…" while it runs.
+
 If the service isn't running it shows "service not running" instead of failing.
 
 ## Architecture

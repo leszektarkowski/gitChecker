@@ -81,13 +81,19 @@ struct MenuContent: View {
     }
 
     private var footer: some View {
-        HStack {
-            Text(refreshedText)
+        HStack(spacing: 10) {
+            Text(model.isScanning ? "scanning…" : refreshedText)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Spacer()
+            // Rescan = re-discover repo folders (find new / prune gone).
+            Button("Rescan") { Task { await model.rescan() } }
+                .buttonStyle(.borderless)
+                .disabled(model.isScanning)
+            // Refresh = re-check status of known repos.
             Button("Refresh") { Task { await model.refresh() } }
                 .buttonStyle(.borderless)
+                .disabled(model.isScanning)
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.borderless)
         }

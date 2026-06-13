@@ -11,6 +11,8 @@ final class AppModel {
     private(set) var lastRefresh: Date?
     /// Non-nil when the service can't be reached (e.g. daemon not running).
     private(set) var connectionError: String?
+    /// True while a (potentially slower) rescan is in flight, for UI feedback.
+    private(set) var isScanning = false
 
     /// How often to poll, in seconds.
     private let pollInterval: UInt64 = 30
@@ -37,14 +39,26 @@ final class AppModel {
         }
     }
 
-    /// Re-inspect repos server-side (if `forceCheck`), then fetch `/summary` and
-    /// `/repos`. `POST /check` is synchronous, so the data read afterwards
-    /// reflects the current on-disk state — that's what makes Refresh actually
-    /// pick up a repo you just cleaned.
+    /// Re-inspect known repos server-side (if `forceCheck`), then reload. This is
+    /// what makes Refresh pick up a repo you just cleaned — `POST /check` is
+    /// synchronous, so the data read afterwards reflects current on-disk state.
     func refresh(forceCheck: Bool = true) async {
+        await reload(trigger: forceCheck ? "check" : nil)
+    }
+
+    /// Re-discover repos under the configured roots (finds new ones / prunes
+    /// gone ones), then reload. `POST /scan` is synchronous and also re-checks.
+    func rescan() async {
+        isScanning = true
+        await reload(trigger: "scan")
+        isScanning = false
+    }
+
+    /// POST `trigger` (if any), then GET `/summary` and `/repos`.
+    private func reload(trigger: String?) async {
         do {
-            if forceCheck {
-                try await post("check")
+            if let trigger {
+                try await post(trigger)
             }
             let summary: Summary = try await get("summary")
             let repos: [RepoStatus] = try await get("repos")
