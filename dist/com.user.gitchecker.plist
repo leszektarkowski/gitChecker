@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.gitchecker</string>
+
+    <!-- Adjust this to the absolute path of your built release binary. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/leszek/code/gitChecker/target/release/gitchecker</string>
+    </array>
+
+    <!-- Start at login and restart on crash. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Optional: set log level. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>RUST_LOG</key>
+        <string>info</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/gitchecker.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/gitchecker.err.log</string>
+</dict>
+</plist>
