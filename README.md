@@ -104,10 +104,12 @@ stash, unpushed commits, or an interrupted operation).
 | Client | Location | Status |
 |--------|----------|--------|
 | macOS menu bar app | [`clients/menubar`](clients/menubar) | ✅ working (`swift run`) |
+| Windows system tray app | [`clients/wingitchecker`](clients/wingitchecker) | ✅ working (`dotnet run`) |
 
-The menu bar app shows the attention count and a click-through list of repos;
-clicking one opens Terminal at its folder. See its
-[README](clients/menubar/README.md).
+Both clients show the attention count and a click-through list of repos; clicking
+one opens a terminal at its folder. See the
+[menu bar README](clients/menubar/README.md) and the
+[system tray README](clients/wingitchecker/README.md).
 
 ## Run as a background service (macOS, launchd)
 
