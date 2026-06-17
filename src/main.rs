@@ -23,7 +23,10 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 /// Max concurrent per-repo operations (status checks / fetches).
 const CONCURRENCY: usize = 8;
 
-#[tokio::main]
+// Single-threaded runtime: this service is idle the vast majority of the time, so
+// one worker thread is plenty. CPU-bound git work is still offloaded to the
+// blocking pool via `spawn_blocking`, keeping the API responsive.
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))

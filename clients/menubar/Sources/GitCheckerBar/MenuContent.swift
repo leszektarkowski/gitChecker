@@ -31,6 +31,10 @@ struct MenuContent: View {
         }
         .padding(pad)
         .frame(width: width)
+        // Best-effort panel open/close detection: fetch fresh on open, idle on
+        // close. Falls back gracefully if these don't fire per-toggle.
+        .onAppear { model.panelOpened() }
+        .onDisappear { model.panelClosed() }
     }
 
     private var loginRow: some View {

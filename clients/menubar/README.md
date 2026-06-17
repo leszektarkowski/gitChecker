@@ -37,7 +37,14 @@ The menu bar item shows:
 
 **Clicking a repo opens Terminal at its folder** (`open -a Terminal <path>`).
 
-It polls every 30s. The footer has:
+**Polling is battery-conscious.** The background poll only reads cached state —
+it never triggers a server-side git re-check. When the panel is closed it just
+refreshes the badge (`GET /summary`) every 60s; when open it also pulls the list
+every 30s. A full re-check (`POST /check`) happens only on panel-open, the
+Refresh button, or the server's own 5-minute timer — so an idle, closed menu bar
+costs essentially nothing.
+
+The footer has:
 
 - **Refresh** — re-check the status of *known* repos (picks up a repo you just
   cleaned or changed). Backed by the synchronous `POST /check`.

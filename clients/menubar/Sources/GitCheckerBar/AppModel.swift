@@ -6,6 +6,8 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+    static let shared = AppModel()
+
     private(set) var summary: Summary = .empty
     private(set) var repos: [RepoStatus] = []
     private(set) var lastRefresh: Date?
@@ -14,10 +16,19 @@ final class AppModel {
     /// True while a (potentially slower) rescan is in flight, for UI feedback.
     private(set) var isScanning = false
 
-    /// How often to poll, in seconds.
-    private let pollInterval: UInt64 = 30
+    /// Whether the panel is currently visible. Drives how hard we poll.
+    private(set) var isPanelOpen = false
+
+    // Poll cadences. The background poll NEVER triggers a server-side re-check
+    // (that's git work); it only reads cached state. Re-checks happen on the
+    // server's own timer, on panel-open, and on the Refresh button — so an idle,
+    // closed menu bar costs nothing but a cheap /summary read every minute.
+    private let openInterval: UInt64 = 30
+    private let closedInterval: UInt64 = 60
     private let base = URL(string: "http://127.0.0.1:7878")!
     private var pollTask: Task<Void, Never>?
+
+    private init() {}
 
     /// Repos worth showing, attention-first then alphabetical.
     var attentionRepos: [RepoStatus] {
@@ -29,41 +40,60 @@ final class AppModel {
     /// Headline badge count for the menu bar.
     var badgeCount: Int { summary.attention }
 
+    /// Start the background poll. Idempotent; call once at launch.
     func start() {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
-                try? await Task.sleep(nanoseconds: (self?.pollInterval ?? 30) * 1_000_000_000)
+                guard let self else { return }
+                // Cheap: read cached state only. Fetch the list only when the
+                // panel is open (it's the only time it's visible).
+                await self.reload(trigger: nil, includeList: self.isPanelOpen)
+                let secs = self.isPanelOpen ? self.openInterval : self.closedInterval
+                try? await Task.sleep(nanoseconds: secs * 1_000_000_000)
             }
         }
+    }
+
+    /// The panel became visible: pull fresh, fully re-checked data right now.
+    func panelOpened() {
+        isPanelOpen = true
+        Task { await self.refresh(forceCheck: true) }
+    }
+
+    /// The panel was hidden: drop back to the cheap badge-only idle poll.
+    func panelClosed() {
+        isPanelOpen = false
     }
 
     /// Re-inspect known repos server-side (if `forceCheck`), then reload. This is
     /// what makes Refresh pick up a repo you just cleaned — `POST /check` is
     /// synchronous, so the data read afterwards reflects current on-disk state.
     func refresh(forceCheck: Bool = true) async {
-        await reload(trigger: forceCheck ? "check" : nil)
+        await reload(trigger: forceCheck ? "check" : nil, includeList: true)
     }
 
     /// Re-discover repos under the configured roots (finds new ones / prunes
     /// gone ones), then reload. `POST /scan` is synchronous and also re-checks.
     func rescan() async {
         isScanning = true
-        await reload(trigger: "scan")
+        await reload(trigger: "scan", includeList: true)
         isScanning = false
     }
 
-    /// POST `trigger` (if any), then GET `/summary` and `/repos`.
-    private func reload(trigger: String?) async {
+    /// POST `trigger` (if any), then GET `/summary` (always) and `/repos` (only
+    /// when `includeList`).
+    private func reload(trigger: String?, includeList: Bool) async {
         do {
             if let trigger {
                 try await post(trigger)
             }
             let summary: Summary = try await get("summary")
-            let repos: [RepoStatus] = try await get("repos")
             self.summary = summary
-            self.repos = repos
+            if includeList {
+                let repos: [RepoStatus] = try await get("repos")
+                self.repos = repos
+            }
             self.connectionError = nil
             self.lastRefresh = Date()
         } catch {
