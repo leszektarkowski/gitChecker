@@ -3,6 +3,7 @@ import SwiftUI
 /// The panel shown when the menu bar item is clicked (window style).
 struct MenuContent: View {
     @Bindable var model: AppModel
+    @State private var login = LoginItem()
 
     /// Fixed panel width. The inner content is pinned to `width - 2*padding` so a
     /// vertical ScrollView can't collapse its width when scrolling activates.
@@ -25,10 +26,27 @@ struct MenuContent: View {
             }
 
             Divider()
+            loginRow
             footer
         }
         .padding(pad)
         .frame(width: width)
+    }
+
+    private var loginRow: some View {
+        HStack(spacing: 6) {
+            Toggle("Start at login", isOn: Binding(
+                get: { login.isEnabled },
+                set: { login.setEnabled($0) }
+            ))
+            .toggleStyle(.checkbox)
+            .font(.caption)
+            .disabled(login.note == "run the packaged .app to enable")
+            if let note = login.note {
+                Text(note).font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
     }
 
     private var header: some View {
@@ -76,6 +94,16 @@ struct MenuContent: View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             Text(message).font(.callout).foregroundStyle(.secondary)
+            Spacer()
+            // Try to (re)start the launchd service, then reload shortly after.
+            Button("Start") {
+                ServiceControl.start()
+                Task {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    await model.refresh()
+                }
+            }
+            .buttonStyle(.borderless)
         }
         .padding(.vertical, 6)
     }

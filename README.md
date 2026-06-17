@@ -111,21 +111,40 @@ one opens a terminal at its folder. See the
 [menu bar README](clients/menubar/README.md) and the
 [system tray README](clients/wingitchecker/README.md).
 
-## Run as a background service (macOS, launchd)
+## Install (macOS)
 
-1. Edit `dist/com.user.gitchecker.plist` so `ProgramArguments` points at your
-   built `release` binary.
-2. Install and start it:
+One command builds everything and sets it up:
 
 ```sh
-cp dist/com.user.gitchecker.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.user.gitchecker.plist
+dist/install.sh
 ```
 
-`RunAtLoad` + `KeepAlive` start it at login and restart it on crash. To stop:
+This:
+
+- builds the release server and installs it to `~/.local/bin/gitchecker`;
+- loads it as a **launchd LaunchAgent** (`com.user.gitchecker`) that starts at
+  login and restarts on crash (`RunAtLoad` + `KeepAlive`), independent of the GUI;
+- builds and installs the menu bar app to `/Applications/GitCheckerBar.app` and
+  launches it.
+
+To have the menu bar app start at login too, open its menu and flip
+**Start at login** (registered via `SMAppService`).
+
+Logs go to `~/Library/Logs/gitchecker.log`. Manage the service directly with:
 
 ```sh
-launchctl unload ~/Library/LaunchAgents/com.user.gitchecker.plist
+launchctl print    gui/$(id -u)/com.user.gitchecker   # status
+launchctl kickstart -k gui/$(id -u)/com.user.gitchecker # restart
+```
+
+> The LaunchAgent sets an explicit `PATH` (`/opt/homebrew/bin:…`) so the server
+> can find `git` when it fetches — launchd's default `PATH` wouldn't include
+> Homebrew.
+
+Uninstall (leaves your config/database):
+
+```sh
+dist/uninstall.sh
 ```
 
 ## License

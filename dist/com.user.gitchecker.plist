@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template LaunchAgent for the gitchecker server.
+  Do not load this file directly — run dist/install.sh, which substitutes the
+  __BIN__ and __LOG__ placeholders with absolute paths and loads it via launchctl.
+-->
 <plist version="1.0">
 <dict>
     <key>Label</key>
     <string>com.user.gitchecker</string>
 
-    <!-- Adjust this to the absolute path of your built release binary. -->
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/leszek/code/gitChecker/target/release/gitchecker</string>
+        <string>__BIN__</string>
     </array>
 
     <!-- Start at login and restart on crash. -->
@@ -18,16 +22,19 @@
     <key>KeepAlive</key>
     <true/>
 
-    <!-- Optional: set log level. -->
     <key>EnvironmentVariables</key>
     <dict>
+        <!-- launchd gives a minimal PATH; add Homebrew + common dirs so the
+             server can find `git` (and `ssh`) when it shells out to fetch. -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>RUST_LOG</key>
         <string>info</string>
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/tmp/gitchecker.out.log</string>
+    <string>__LOG__</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/gitchecker.err.log</string>
+    <string>__LOG__</string>
 </dict>
 </plist>
