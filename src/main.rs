@@ -7,8 +7,6 @@ mod db;
 mod fetch;
 mod model;
 mod scan;
-#[cfg(windows)]
-mod service;
 mod status;
 
 use crate::api::AppState;
@@ -16,7 +14,6 @@ use crate::config::Config;
 use crate::db::Db;
 use crate::status::{compute_status, now_unix};
 use anyhow::Result;
-use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::{Notify, Semaphore};
 use tokio::task::JoinSet;
@@ -26,39 +23,11 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 /// Max concurrent per-repo operations (status checks / fetches).
 const CONCURRENCY: usize = 8;
 
-fn main() -> Result<()> {
-    // When the Windows Service Control Manager launches us (the install script
-    // registers the binary as `gitchecker.exe --service`), hand control to the
-    // service dispatcher instead of running in the foreground.
-    #[cfg(windows)]
-    if std::env::args().any(|a| a == "--service") {
-        return service::run();
-    }
-
-    // Foreground / console mode: run until the process is killed (Ctrl-C).
-    run_server(std::future::pending::<()>())
-}
-
-/// Build the runtime and drive the server until `shutdown` resolves. Shared by
-/// console mode and the Windows service entry point.
-///
-/// Single-threaded runtime: this service is idle the vast majority of the time,
-/// so one worker thread is plenty. CPU-bound git work is still offloaded to the
-/// blocking pool via `spawn_blocking`, keeping the API responsive.
-pub fn run_server<F>(shutdown: F) -> Result<()>
-where
-    F: Future<Output = ()> + Send + 'static,
-{
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-    rt.block_on(serve(shutdown))
-}
-
-async fn serve<F>(shutdown: F) -> Result<()>
-where
-    F: Future<Output = ()> + Send + 'static,
-{
+// Single-threaded runtime: this service is idle the vast majority of the time, so
+// one worker thread is plenty. CPU-bound git work is still offloaded to the
+// blocking pool via `spawn_blocking`, keeping the API responsive.
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .with(tracing_subscriber::fmt::layer())
@@ -99,10 +68,7 @@ where
     };
     let listener = tokio::net::TcpListener::bind(cfg.listen_addr).await?;
     tracing::info!(addr = %cfg.listen_addr, "API listening");
-    axum::serve(listener, api::router(state))
-        .with_graceful_shutdown(shutdown)
-        .await?;
-    tracing::info!("shutting down");
+    axum::serve(listener, api::router(state)).await?;
     Ok(())
 }
 

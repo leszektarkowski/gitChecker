@@ -121,7 +121,9 @@ impl RepoStatus {
 pub struct Summary {
     /// Total repos tracked.
     pub total: usize,
-    /// Repos with local work at risk (`is_dirty`): the headline badge count.
+    /// Headline badge count: repos with local work at risk (`is_dirty`) **or**
+    /// that couldn't be read at all (a read error hides the real state, so it
+    /// warrants attention rather than a misleading "all clean").
     pub attention: usize,
     /// Repos with working-tree changes (staged / unstaged / untracked).
     pub uncommitted: usize,
@@ -146,7 +148,7 @@ impl Summary {
             ..Default::default()
         };
         for r in repos {
-            if r.is_dirty() {
+            if r.is_dirty() || r.error.is_some() {
                 s.attention += 1;
             }
             if r.has_staged || r.has_unstaged || r.has_untracked {

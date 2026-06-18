@@ -20,8 +20,3 @@ toml = "1.1.2"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 walkdir = "2.5.0"
-
-# Windows-only: lets the binary run under the Service Control Manager when
-# launched as `gitchecker.exe --service` (see src/service.rs).
-[target.'cfg(windows)'.dependencies]
-windows-service = "0.7"

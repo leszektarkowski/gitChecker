@@ -87,9 +87,10 @@ Build with `build.ps1` (above), then drop a shortcut to the published
 #   shell:startup   (Win+R → shell:startup)
 ```
 
-The **server** is the part that runs as a background **Windows service** — see
-[`dist\windows\install-service.ps1`](../../dist/windows/install-service.ps1) and
-the [root README](../../README.md#install-windows). This tray app is a separate,
+The **server** is the part that runs in the background, at logon, via a per-user
+**Scheduled Task** — see
+[`dist\windows\install.ps1`](../../dist/windows/install.ps1) and the
+[root README](../../README.md#install-windows). This tray app is a separate,
 user-level client.
 
 Packaging (a signed `.exe` / MSIX) is a future step.

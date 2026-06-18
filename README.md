@@ -149,41 +149,36 @@ dist/uninstall.sh
 
 ## Install (Windows)
 
-The server runs as a **Windows service** (the counterpart of the macOS
-LaunchAgent). The binary is service-aware: the install script registers it as
-`gitchecker.exe --service`, which runs it under the Service Control Manager.
+The server runs at logon via a per-user **Scheduled Task** — the direct analog of
+the macOS LaunchAgent. Crucially it runs as **you**, not as a system account: git
+refuses to operate on a repository owned by a different user (the "dubious
+ownership" protection), so a LocalSystem service can't read your repos at all and
+has none of your git credentials. Running as you avoids both problems.
 
-From a normal PowerShell (it self-elevates via a UAC prompt — no need to open an
-admin terminal first):
+From a normal PowerShell (it self-elevates via a UAC prompt — elevation is only
+needed to register the task and to clear out any previous service install):
 
 ```powershell
-# Build the server and register + start it as an auto-start service:
-dist\windows\install-service.ps1 -ScanRoots 'C:\Users\me\code'
+dist\windows\install.ps1
 ```
 
 This:
 
 - builds the release server (warns if the Rust toolchain is missing);
 - copies it to `%ProgramData%\gitchecker\bin\gitchecker.exe`;
-- seeds a config for the service account (first install only) with your
-  `scan_roots`, so it scans the right folders out of the box;
-- registers the **`gitchecker`** service (auto-start, restarts on crash via
-  `sc failure`), then starts it and waits for `http://127.0.0.1:7878` to come up.
+- removes any leftover LocalSystem `gitchecker` service from older installs;
+- registers a Scheduled Task that starts the server **at logon, hidden, as you**,
+  restarting on crash, then starts it and waits for `http://127.0.0.1:7878`.
 
-Re-run any time to upgrade to a fresh build. Manage it with the usual tools:
+Because it runs as you, the config lives at the normal per-user path
+`%APPDATA%\gitchecker\config\config.toml` and scans `~\code` by default. Re-run
+the script any time to upgrade to a fresh build. Manage it with:
 
 ```powershell
-sc.exe query gitchecker      # status
-sc.exe stop  gitchecker
-sc.exe start gitchecker
+Get-ScheduledTaskInfo gitchecker   # status / last run
+Stop-ScheduledTask     gitchecker
+Start-ScheduledTask    gitchecker
 ```
-
-> The service runs as **LocalSystem**, whose config lives under
-> `C:\Windows\System32\config\systemprofile\AppData\Roaming\gitchecker\config\config.toml`.
-> LocalSystem has no user git credentials, so SSH `git fetch` will fail
-> (handled gracefully — `behind origin` may be stale; set `fetch_enabled = false`
-> to skip the network). Local status (dirty / ahead / stash) needs no credentials
-> and always works.
 
 Build-only helpers (no admin needed):
 
@@ -195,7 +190,7 @@ clients\wingitchecker\build.ps1          # build/publish the tray client
 Uninstall (leaves your config/database; add `-Purge` to remove them too):
 
 ```powershell
-dist\windows\uninstall-service.ps1
+dist\windows\uninstall.ps1
 ```
 
 The **tray client** (`clients\wingitchecker`) is a separate, user-level app — see
