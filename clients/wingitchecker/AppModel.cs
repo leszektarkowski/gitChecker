@@ -21,10 +21,18 @@ public sealed class AppModel : IDisposable
     /// True while a (potentially slower) rescan is in flight, for UI feedback.
     public bool IsScanning { get; private set; }
 
+    /// Whether the panel is currently visible. Drives how hard we poll.
+    public bool IsPanelOpen { get; private set; }
+
     /// Raised on the UI thread after any state change.
     public event Action? Changed;
 
-    private const int PollIntervalMs = 30_000;
+    // Poll cadences. The background poll NEVER triggers a server-side re-check
+    // (that's git work); it only reads cached state. Re-checks happen on the
+    // server's own timer, on panel-open, and on the Refresh/Rescan buttons — so
+    // an idle, closed tray costs nothing but a cheap /summary read every minute.
+    private const int OpenIntervalMs = 30_000;
+    private const int ClosedIntervalMs = 60_000;
     private readonly HttpClient _http;
     private readonly System.Windows.Forms.Timer _timer = new();
     private readonly JsonSerializerOptions _json = new()
@@ -53,7 +61,8 @@ public sealed class AppModel : IDisposable
              .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
              .ToList();
 
-    /// Begin polling. The first poll fires almost immediately, then every 30s.
+    /// Begin polling. The first poll fires almost immediately, then settles into
+    /// the cadence appropriate to the panel state (60s closed, 30s open).
     public void Start()
     {
         _timer.Interval = 200;
@@ -62,8 +71,27 @@ public sealed class AppModel : IDisposable
 
     private async void OnTick(object? sender, EventArgs e)
     {
-        _timer.Interval = PollIntervalMs; // settle into the normal cadence
-        await RefreshAsync();
+        // Settle into the cadence for the current panel state.
+        _timer.Interval = IsPanelOpen ? OpenIntervalMs : ClosedIntervalMs;
+        // Cheap: read cached state only — never a server-side re-check. Fetch the
+        // repo list only when the panel is open (the only time it's visible).
+        await ReloadAsync(trigger: null, includeList: IsPanelOpen);
+    }
+
+    /// The panel became visible: switch to the fast cadence and pull fresh,
+    /// fully re-checked data right now.
+    public void PanelOpened()
+    {
+        IsPanelOpen = true;
+        _timer.Interval = OpenIntervalMs;
+        _ = RefreshAsync();
+    }
+
+    /// The panel was hidden: drop back to the cheap badge-only idle poll.
+    public void PanelClosed()
+    {
+        IsPanelOpen = false;
+        _timer.Interval = ClosedIntervalMs;
     }
 
     /// Re-inspect known repos server-side (POST /check is synchronous), then reload.
@@ -81,8 +109,9 @@ public sealed class AppModel : IDisposable
         Changed?.Invoke();
     }
 
-    /// POST <paramref name="trigger"/> (if any), then GET /summary and /repos.
-    private async Task ReloadAsync(string? trigger)
+    /// POST <paramref name="trigger"/> (if any), then GET /summary (always) and
+    /// /repos (only when <paramref name="includeList"/>).
+    private async Task ReloadAsync(string? trigger, bool includeList = true)
     {
         if (_busy) return;
         _busy = true;
@@ -92,10 +121,12 @@ public sealed class AppModel : IDisposable
                 await PostAsync(trigger);
 
             var summary = await GetAsync<Summary>("summary");
-            var repos = await GetAsync<List<RepoStatus>>("repos");
-
             Summary = summary ?? Summary.Empty;
-            Repos = repos ?? new List<RepoStatus>();
+            if (includeList)
+            {
+                var repos = await GetAsync<List<RepoStatus>>("repos");
+                Repos = repos ?? new List<RepoStatus>();
+            }
             ConnectionError = null;
             LastRefresh = DateTime.Now;
         }

@@ -21,7 +21,16 @@ public sealed class TrayApp : ApplicationContext
         _panel = new PanelForm(_model);
         _panel.VisibleChanged += (_, _) =>
         {
-            if (!_panel.Visible) _lastHidden = DateTime.Now;
+            // Fetch fresh on open, drop to the cheap idle poll on close.
+            if (_panel.Visible)
+            {
+                _model.PanelOpened();
+            }
+            else
+            {
+                _lastHidden = DateTime.Now;
+                _model.PanelClosed();
+            }
         };
 
         var menu = new ContextMenuStrip();

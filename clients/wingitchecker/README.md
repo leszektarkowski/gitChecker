@@ -33,7 +33,14 @@ The tray icon shows:
 **Clicking a repo opens a terminal at its folder** — Windows Terminal (`wt.exe -d
 <path>`) if installed, otherwise PowerShell rooted in the folder.
 
-It polls every 30s. The panel footer has three actions (also on the icon's
+**Polling is battery-conscious.** The background poll only reads cached state —
+it never triggers a server-side git re-check. When the panel is closed it just
+refreshes the badge (`GET /summary`) every 60s; when open it also pulls the list
+(`GET /repos`) every 30s. A full re-check (`POST /check`) happens only on
+panel-open, the Refresh button, or the server's own 5-minute timer — so an idle,
+closed tray costs essentially nothing.
+
+The panel footer has three actions (also on the icon's
 **right-click** menu):
 
 - **Refresh** — re-check the status of *known* repos (picks up a repo you just
