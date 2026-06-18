@@ -147,6 +147,61 @@ Uninstall (leaves your config/database):
 dist/uninstall.sh
 ```
 
+## Install (Windows)
+
+The server runs as a **Windows service** (the counterpart of the macOS
+LaunchAgent). The binary is service-aware: the install script registers it as
+`gitchecker.exe --service`, which runs it under the Service Control Manager.
+
+From a normal PowerShell (it self-elevates via a UAC prompt — no need to open an
+admin terminal first):
+
+```powershell
+# Build the server and register + start it as an auto-start service:
+dist\windows\install-service.ps1 -ScanRoots 'C:\Users\me\code'
+```
+
+This:
+
+- builds the release server (warns if the Rust toolchain is missing);
+- copies it to `%ProgramData%\gitchecker\bin\gitchecker.exe`;
+- seeds a config for the service account (first install only) with your
+  `scan_roots`, so it scans the right folders out of the box;
+- registers the **`gitchecker`** service (auto-start, restarts on crash via
+  `sc failure`), then starts it and waits for `http://127.0.0.1:7878` to come up.
+
+Re-run any time to upgrade to a fresh build. Manage it with the usual tools:
+
+```powershell
+sc.exe query gitchecker      # status
+sc.exe stop  gitchecker
+sc.exe start gitchecker
+```
+
+> The service runs as **LocalSystem**, whose config lives under
+> `C:\Windows\System32\config\systemprofile\AppData\Roaming\gitchecker\config\config.toml`.
+> LocalSystem has no user git credentials, so SSH `git fetch` will fail
+> (handled gracefully — `behind origin` may be stale; set `fetch_enabled = false`
+> to skip the network). Local status (dirty / ahead / stash) needs no credentials
+> and always works.
+
+Build-only helpers (no admin needed):
+
+```powershell
+dist\windows\build-server.ps1            # just build the server exe
+clients\wingitchecker\build.ps1          # build/publish the tray client
+```
+
+Uninstall (leaves your config/database; add `-Purge` to remove them too):
+
+```powershell
+dist\windows\uninstall-service.ps1
+```
+
+The **tray client** (`clients\wingitchecker`) is a separate, user-level app — see
+its [README](clients/wingitchecker/README.md). Build it with `build.ps1` and drop
+a shortcut to the published exe into `shell:startup` to launch it at login.
+
 ## License
 
 [MIT](LICENSE) — do whatever you like, just keep the copyright notice.

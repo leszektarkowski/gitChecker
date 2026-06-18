@@ -66,15 +66,30 @@ Mirrors the macOS client's structure:
 | `IconRenderer.cs` | draws the count/✓ tray icon at runtime | (menu bar label) |
 | `TerminalLauncher.cs` | opens a terminal at a repo path | `TerminalLauncher.swift` |
 
-## Later: run at login
+## Build
 
-`dotnet run` is for development. To start it at login like the daemon, publish a
-self-contained binary and add it to your startup:
+`dotnet run` is for development. `build.ps1` produces a runnable build:
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained
-# then drop a shortcut to the published WinGitChecker.exe into:
+clients\wingitchecker\build.ps1                 # framework-dependent publish → .\publish
+clients\wingitchecker\build.ps1 -SelfContained  # standalone exe (bundles the .NET runtime)
+clients\wingitchecker\build.ps1 -Mode build     # just compile → bin\Release
+```
+
+It warns and exits if the .NET SDK isn't on `PATH`.
+
+## Later: run at login
+
+Build with `build.ps1` (above), then drop a shortcut to the published
+`WinGitChecker.exe` into your startup folder:
+
+```powershell
 #   shell:startup   (Win+R → shell:startup)
 ```
+
+The **server** is the part that runs as a background **Windows service** — see
+[`dist\windows\install-service.ps1`](../../dist/windows/install-service.ps1) and
+the [root README](../../README.md#install-windows). This tray app is a separate,
+user-level client.
 
 Packaging (a signed `.exe` / MSIX) is a future step.
