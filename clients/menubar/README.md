@@ -54,6 +54,13 @@ The footer has:
 - **Start at login** — a checkbox that registers/unregisters the app as a login
   item via `SMAppService` (only effective when run as the installed `.app`, not
   via `swift run`).
+- **Configure…** — opens the server config
+  (`~/Library/Application Support/gitchecker/config.toml`) in the default text
+  editor.
+- **Restart** — restarts the service so a config edit takes effect (the server
+  reads its config only at startup). It verifies the service comes back up via
+  `/healthz`; if it doesn't — usually a malformed config — it warns you to check
+  the file and the log instead of silently crash-looping.
 
 If the service isn't running it shows "service not running" with a **Start**
 button that runs `launchctl kickstart` on the LaunchAgent.

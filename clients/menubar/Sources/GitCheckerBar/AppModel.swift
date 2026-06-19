@@ -15,6 +15,8 @@ final class AppModel {
     private(set) var connectionError: String?
     /// True while a (potentially slower) rescan is in flight, for UI feedback.
     private(set) var isScanning = false
+    /// True while restarting the service (after a config edit).
+    private(set) var isRestarting = false
 
     /// Whether the panel is currently visible. Drives how hard we poll.
     private(set) var isPanelOpen = false
@@ -64,6 +66,38 @@ final class AppModel {
     /// The panel was hidden: drop back to the cheap badge-only idle poll.
     func panelClosed() {
         isPanelOpen = false
+    }
+
+    /// Restart the launchd service (to apply a config edit) and verify it comes
+    /// back up. If it doesn't within a few seconds — typically a malformed
+    /// config that makes the server crash-loop — surface a clear error instead
+    /// of leaving the user guessing.
+    func restartService() async {
+        isRestarting = true
+        defer { isRestarting = false }
+
+        ServiceControl.start() // launchctl kickstart -k: restarts (or starts) it
+
+        // Poll healthz until the new process binds the port (or give up).
+        for _ in 0..<12 {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if await pingHealthz() {
+                await reload(trigger: nil, includeList: isPanelOpen)
+                return
+            }
+        }
+        connectionError =
+            "service didn't restart — check config.toml (see ~/Library/Logs/gitchecker.log)"
+    }
+
+    /// Lightweight liveness check: did `/healthz` respond 2xx?
+    private func pingHealthz() async -> Bool {
+        do {
+            let (_, response) = try await URLSession.shared.data(from: base.appendingPathComponent("healthz"))
+            return (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
+        } catch {
+            return false
+        }
     }
 
     /// Re-inspect known repos server-side (if `forceCheck`), then reload. This is

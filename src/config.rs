@@ -83,7 +83,10 @@ fn project_dirs() -> Result<ProjectDirs> {
         .context("could not determine a home directory for config/data")
 }
 
-/// Default config file path (`~/.config/gitchecker/config.toml` on Linux/macOS).
+/// Default config file path. Resolves per-platform via `directories`:
+/// - macOS:   `~/Library/Application Support/gitchecker/config.toml`
+/// - Linux:   `~/.config/gitchecker/config.toml`
+/// - Windows: `%APPDATA%\gitchecker\config\config.toml`
 pub fn config_path() -> Result<PathBuf> {
     Ok(project_dirs()?.config_dir().join("config.toml"))
 }

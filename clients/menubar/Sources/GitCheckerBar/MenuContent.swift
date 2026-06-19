@@ -27,6 +27,11 @@ struct MenuContent: View {
 
             Divider()
             loginRow
+            if let note = login.note {
+                Text(note)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
             footer
         }
         .padding(pad)
@@ -46,10 +51,15 @@ struct MenuContent: View {
             .toggleStyle(.checkbox)
             .font(.caption)
             .disabled(login.note == "run the packaged .app to enable")
-            if let note = login.note {
-                Text(note).font(.caption2).foregroundStyle(.secondary)
-            }
             Spacer()
+            // Open config.toml in the default text editor.
+            Button("Configure…") { ConfigFile.openInEditor() }
+                .buttonStyle(.borderless)
+                .disabled(model.isRestarting)
+            // Apply edits: restart the service (it reads config only at startup).
+            Button("Restart") { Task { await model.restartService() } }
+                .buttonStyle(.borderless)
+                .disabled(model.isRestarting)
         }
     }
 
@@ -114,21 +124,27 @@ struct MenuContent: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Text(model.isScanning ? "scanning…" : refreshedText)
+            Text(statusText)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Spacer()
             // Rescan = re-discover repo folders (find new / prune gone).
             Button("Rescan") { Task { await model.rescan() } }
                 .buttonStyle(.borderless)
-                .disabled(model.isScanning)
+                .disabled(model.isScanning || model.isRestarting)
             // Refresh = re-check status of known repos.
             Button("Refresh") { Task { await model.refresh() } }
                 .buttonStyle(.borderless)
-                .disabled(model.isScanning)
+                .disabled(model.isScanning || model.isRestarting)
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.borderless)
         }
+    }
+
+    private var statusText: String {
+        if model.isRestarting { return "restarting…" }
+        if model.isScanning { return "scanning…" }
+        return refreshedText
     }
 
     private var refreshedText: String {
