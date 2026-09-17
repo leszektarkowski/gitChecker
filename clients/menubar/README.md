@@ -35,7 +35,9 @@ The menu bar item shows:
   `↑N` ahead · `↓N` behind · `●` working-tree changes · `⚑N` stashes ·
   `detached` · `⚠` fetch failed.
 
-**Clicking a repo opens Terminal at its folder** (`open -a Terminal <path>`).
+**Clicking a repo runs the configured `open_command`** with `{path}` set to the
+repo's folder (from the server config; defaults to opening Terminal). Set it to
+e.g. `smerge {path}` for Sublime Merge — see the top-level README.
 
 **Polling is battery-conscious.** The background poll only reads cached state —
 it never triggers a server-side git re-check. When the panel is closed it just

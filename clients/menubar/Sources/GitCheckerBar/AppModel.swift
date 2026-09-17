@@ -20,6 +20,9 @@ final class AppModel {
 
     /// Whether the panel is currently visible. Drives how hard we poll.
     private(set) var isPanelOpen = false
+    /// Command run when a repo is clicked (`{path}` = repo folder), from the
+    /// server config. Empty until first fetched; the opener falls back to Terminal.
+    private(set) var openCommand = ""
 
     // Poll cadences. The background poll NEVER triggers a server-side re-check
     // (that's git work); it only reads cached state. Re-checks happen on the
@@ -127,6 +130,12 @@ final class AppModel {
             if includeList {
                 let repos: [RepoStatus] = try await get("repos")
                 self.repos = repos
+                // The open command only matters when the list is visible (you're
+                // about to click a repo); fetch it here so it stays current after
+                // a config edit + restart without an extra request while idle.
+                if let cfg: OpenConfig = try? await get("config") {
+                    self.openCommand = cfg.openCommand
+                }
             }
             self.connectionError = nil
             self.lastRefresh = Date()

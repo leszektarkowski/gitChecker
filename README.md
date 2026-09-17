@@ -65,9 +65,23 @@ check_interval_secs = 300          # 5 min
 fetch_interval_secs = 1800         # 30 min
 fetch_enabled = true               # set false to never touch the network
 listen_addr = "127.0.0.1:7878"
+open_command = "open -a Terminal {path}"   # run when you click a repo
 ```
 
 `~` in `scan_roots` is expanded to your home directory.
+
+`open_command` is what a client runs when you click a repo; `{path}` is replaced
+by the repo's folder (inserted safely — no need to quote it). Examples (macOS):
+
+```toml
+open_command = "smerge {path}"                    # Sublime Merge
+open_command = 'open -a "Sublime Merge" {path}'   # Sublime Merge (no CLI needed)
+open_command = 'open -a "Visual Studio Code" {path}'
+open_command = "open -a Terminal {path}"          # default
+```
+
+Config is read at startup, so restart the service after editing (the menu bar
+app's **Restart** button does this).
 
 ## HTTP API
 
@@ -77,6 +91,7 @@ listen_addr = "127.0.0.1:7878"
 | `GET /repos` | all tracked repos with current status (JSON array) |
 | `GET /repos/{id}` | one repo by id (`id` is a stable hash of its path) |
 | `GET /summary` | aggregate counts across all repos (cheap; for badges/prompts) |
+| `GET /config` | client-relevant config (currently `open_command`) |
 | `POST /scan` | trigger a discovery scan now (async, returns `202`) |
 | `POST /check` | re-inspect all repos **synchronously**; returns `200` once done, so a follow-up `GET /repos` reflects current on-disk state |
 

@@ -77,3 +77,8 @@ struct Summary: Decodable {
         total: 0, attention: 0, uncommitted: 0, ahead: 0, behind: 0,
         stashed: 0, inProgress: 0, fetchErrors: 0, readErrors: 0)
 }
+
+/// Client-relevant config, decoded from `GET /config`.
+struct OpenConfig: Decodable {
+    let openCommand: String
+}

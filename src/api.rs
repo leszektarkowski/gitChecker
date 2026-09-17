@@ -27,6 +27,7 @@ pub fn router(state: AppState) -> Router {
         .route("/repos", get(list_repos))
         .route("/repos/{id}", get(get_repo))
         .route("/summary", get(summary))
+        .route("/config", get(get_config))
         .route("/scan", post(trigger_scan))
         .route("/check", post(trigger_check))
         .with_state(state)
@@ -34,6 +35,13 @@ pub fn router(state: AppState) -> Router {
 
 async fn healthz() -> &'static str {
     "ok"
+}
+
+/// Client-relevant config. Currently just the command a client runs to open a
+/// repo (with `{path}` substituted). Read from the in-memory config, so it
+/// reflects whatever the server loaded at startup.
+async fn get_config(State(state): State<AppState>) -> impl IntoResponse {
+    Json(serde_json::json!({ "open_command": state.cfg.open_command }))
 }
 
 async fn list_repos(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {

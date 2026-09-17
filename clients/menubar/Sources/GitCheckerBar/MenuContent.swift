@@ -87,7 +87,7 @@ struct MenuContent: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(model.attentionRepos) { repo in
-                    RepoRow(repo: repo) { TerminalLauncher.open(at: repo.path) }
+                    RepoRow(repo: repo) { RepoOpener.open(command: model.openCommand, path: repo.path) }
                 }
             }
             // Pin to a definite width so the ScrollView can't collapse it.

@@ -27,6 +27,31 @@ pub struct Config {
 
     /// Address the HTTP API listens on.
     pub listen_addr: SocketAddr,
+
+    /// Command a client runs when you click a repo, with `{path}` replaced by the
+    /// repo's folder. `{path}` is inserted safely (spaces handled) — don't wrap
+    /// it in quotes yourself. Examples (macOS):
+    ///   open -a Terminal {path}          (default)
+    ///   open -a "Sublime Merge" {path}
+    ///   open -a "Visual Studio Code" {path}
+    pub open_command: String,
+}
+
+/// Platform-appropriate default: open a terminal at the repo folder (matches the
+/// previous hard-coded behaviour).
+fn default_open_command() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        "open -a Terminal {path}".to_string()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        "cmd /c start cmd /k cd /d \"{path}\"".to_string()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        "x-terminal-emulator --working-directory={path}".to_string()
+    }
 }
 
 impl Default for Config {
@@ -49,6 +74,7 @@ impl Default for Config {
             fetch_interval_secs: 30 * 60,
             fetch_enabled: true,
             listen_addr: "127.0.0.1:7878".parse().unwrap(),
+            open_command: default_open_command(),
         }
     }
 }
