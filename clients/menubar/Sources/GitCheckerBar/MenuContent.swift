@@ -36,6 +36,9 @@ struct MenuContent: View {
         }
         .padding(pad)
         .frame(width: width)
+        // Report the exact ideal height so the popover window fits the content
+        // tightly (avoids the over-tall window / empty top+bottom margins).
+        .fixedSize(horizontal: false, vertical: true)
         // Best-effort panel open/close detection: fetch fresh on open, idle on
         // close. Falls back gracefully if these don't fire per-toggle.
         .onAppear { model.panelOpened() }
@@ -74,26 +77,27 @@ struct MenuContent: View {
         }
     }
 
-    /// Explicit list height: a ScrollView in a self-sizing MenuBarExtra window
-    /// has no definite height and collapses to one row, so we size it to the
-    /// content (estimated per-row) capped at `maxListHeight`.
-    private let maxListHeight: CGFloat = 380
-    private var listHeight: CGFloat {
-        let perRow: CGFloat = 44
-        return min(CGFloat(model.attentionRepos.count) * perRow, maxListHeight)
-    }
+    /// Cap the visible rows so a long list can't make an oversized panel. A
+    /// plain VStack (no ScrollView) lets the popover window size itself exactly
+    /// to the content — a ScrollView with a fixed frame height leaves the window
+    /// stuck at its largest size, showing empty margins when the list shrinks.
+    private let maxVisibleRepos = 12
 
     private var repoList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(model.attentionRepos) { repo in
-                    RepoRow(repo: repo) { RepoOpener.open(command: model.openCommand, path: repo.path) }
-                }
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(model.attentionRepos.prefix(maxVisibleRepos))) { repo in
+                RepoRow(repo: repo) { RepoOpener.open(command: model.openCommand, path: repo.path) }
             }
-            // Pin to a definite width so the ScrollView can't collapse it.
-            .frame(width: contentWidth, alignment: .leading)
+            let extra = model.attentionRepos.count - maxVisibleRepos
+            if extra > 0 {
+                Text("+\(extra) more…")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+            }
         }
-        .frame(height: listHeight)
+        .frame(width: contentWidth, alignment: .leading)
     }
 
     private var allClear: some View {
