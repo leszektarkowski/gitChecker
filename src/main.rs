@@ -176,13 +176,17 @@ async fn fetch_loop(
             _ = ticker.tick() => {}
             _ = fetch_notify.notified() => {}
         }
-        let paths = match db.list_paths() {
+        // Only repos not currently backing off after repeated failures.
+        let paths = match db.list_fetch_candidates(now_unix()) {
             Ok(p) => p,
             Err(e) => {
                 tracing::warn!(error = %e, "could not list repos for fetch");
                 continue;
             }
         };
+        tracing::debug!(candidates = paths.len(), "fetch cycle");
+        let base = cfg.fetch_interval_secs as i64;
+        let cap = fetch::FETCH_BACKOFF_CAP.as_secs() as i64;
 
         let sem = Arc::new(Semaphore::new(CONCURRENCY));
         let mut set = JoinSet::new();
@@ -203,12 +207,12 @@ async fn fetch_loop(
                     }
                     Ok(Ok(Err(msg))) => {
                         tracing::debug!(repo = %path.display(), error = %msg, "fetch failed");
-                        let _ = db.set_fetch_error(&path, &msg);
+                        let _ = db.record_fetch_failure(&path, &msg, base, cap);
                     }
                     Ok(Err(e)) => tracing::warn!(error = %e, "fetch task panicked"),
                     Err(_) => {
                         tracing::debug!(repo = %path.display(), "fetch timed out");
-                        let _ = db.set_fetch_error(&path, "fetch timed out");
+                        let _ = db.record_fetch_failure(&path, "fetch timed out", base, cap);
                     }
                 }
             });

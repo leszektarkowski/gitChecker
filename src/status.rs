@@ -49,6 +49,12 @@ fn working_tree(repo: &Repository, status: &mut RepoStatus) -> Result<(), git2::
     let mut opts = StatusOptions::new();
     opts.include_untracked(true)
         .include_ignored(false)
+        // libgit2's defaults include RECURSE_UNTRACKED_DIRS, which walks every
+        // file inside an untracked directory. We only need the boolean "is
+        // anything untracked?", so one entry per untracked dir is enough — this
+        // keeps a stray build/ or un-ignored node_modules/ from being stat'ed
+        // in full on every check.
+        .recurse_untracked_dirs(false)
         .renames_head_to_index(true)
         .renames_index_to_workdir(true);
 

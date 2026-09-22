@@ -11,7 +11,12 @@ It runs two cadences:
 - **Status check** (default: every 5 min) — recompute each repo's local status.
 
 A separate, slower **fetch** loop (default: every 30 min) runs `git fetch` so the
-`behind origin` count stays fresh without hammering remotes.
+`behind origin` count stays fresh without hammering remotes. A repo whose fetch
+keeps failing (bad credentials, unreachable host) is retried with **exponential
+backoff** — the wait doubles from the fetch interval up to a 6 h cap, and resets
+on the next success — so a broken remote doesn't cost a network attempt every
+cycle. Status checks only touch the database when a repo's status actually
+changes, so an idle machine does essentially no disk I/O.
 
 ## Status model
 

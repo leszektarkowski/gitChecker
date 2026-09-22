@@ -45,3 +45,7 @@ pub fn fetch_repo(path: &Path) -> Result<(), String> {
 /// Upper bound on how long a single fetch may run before we consider it stuck.
 /// (Enforced by the caller via `spawn_blocking` + timeout.)
 pub const FETCH_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Longest we'll wait between retries of a repo whose fetches keep failing
+/// (e.g. missing credentials). Backoff doubles from `fetch_interval` up to this.
+pub const FETCH_BACKOFF_CAP: Duration = Duration::from_secs(6 * 60 * 60);
