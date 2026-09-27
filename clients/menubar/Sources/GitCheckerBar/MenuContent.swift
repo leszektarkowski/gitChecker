@@ -99,7 +99,7 @@ struct MenuContent: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(shownRepos) { repo in
-                    RepoRow(repo: repo) { RepoOpener.open(command: model.openCommand, path: repo.path) }
+                    RepoRow(repo: repo, model: model) { RepoOpener.open(command: model.openCommand, path: repo.path) }
                 }
             }
             .frame(width: contentWidth, alignment: .leading)
@@ -177,8 +177,14 @@ struct MenuContent: View {
 /// A single clickable repo row: name, branch, and compact status badges.
 private struct RepoRow: View {
     let repo: RepoStatus
+    let model: AppModel
     let action: () -> Void
     @State private var hovering = false
+    /// Hover card, opened only after the pointer rests on the row briefly, so
+    /// sweeping across the list doesn't flash cards or trigger scans.
+    @State private var showCard = false
+    @State private var hoverTask: Task<Void, Never>?
+    private let hoverDelay: UInt64 = 400_000_000 // 0.4 s
 
     var body: some View {
         Button(action: action) {
@@ -209,7 +215,20 @@ private struct RepoRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(repo.path)
-        .onHover { hovering = $0 }
+        .onHover { inside in
+            hovering = inside
+            hoverTask?.cancel()
+            if inside {
+                hoverTask = Task {
+                    try? await Task.sleep(nanoseconds: hoverDelay)
+                    if !Task.isCancelled { showCard = true }
+                }
+            } else {
+                showCard = false
+            }
+        }
+        .popover(isPresented: $showCard, arrowEdge: .leading) {
+            RepoHoverCard(repo: repo, model: model)
+        }
     }
 }

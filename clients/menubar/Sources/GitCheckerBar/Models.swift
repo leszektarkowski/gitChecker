@@ -82,3 +82,29 @@ struct Summary: Decodable {
 struct OpenConfig: Decodable {
     let openCommand: String
 }
+
+/// On-demand detail for one repo, decoded from `GET /repos/{id}/details`.
+struct RepoDetails: Decodable {
+    struct FileChange: Decodable, Hashable {
+        let path: String
+        let kind: String
+    }
+    struct FileGroup: Decodable {
+        let total: Int
+        let files: [FileChange]
+    }
+    struct Commit: Decodable {
+        let summary: String
+        let author: String
+        let time: Int
+    }
+
+    let staged: FileGroup
+    let unstaged: FileGroup
+    let untracked: FileGroup
+    let conflicted: FileGroup
+    let lastCommit: Commit?
+    let remoteUrl: String?
+    let stashes: [String]
+    let error: String?
+}

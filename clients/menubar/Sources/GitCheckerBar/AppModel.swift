@@ -106,6 +106,22 @@ final class AppModel {
         }
     }
 
+    /// Hover-card details, cached briefly so moving back and forth over the same
+    /// row doesn't re-scan the repo each time.
+    private var detailsCache: [String: (at: Date, details: RepoDetails)] = [:]
+    private let detailsTTL: TimeInterval = 10
+
+    /// Fetch detail (changed files, last commit, remote, stashes) for one repo.
+    /// Runs a status scan of just that repo on the server, only when asked.
+    func details(for id: String) async -> RepoDetails? {
+        if let cached = detailsCache[id], Date().timeIntervalSince(cached.at) < detailsTTL {
+            return cached.details
+        }
+        guard let fresh: RepoDetails = try? await get("repos/\(id)/details") else { return nil }
+        detailsCache[id] = (Date(), fresh)
+        return fresh
+    }
+
     /// Re-inspect known repos server-side (if `forceCheck`), then reload. This is
     /// what makes Refresh pick up a repo you just cleaned — `POST /check` is
     /// synchronous, so the data read afterwards reflects current on-disk state.

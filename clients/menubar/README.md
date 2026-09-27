@@ -35,6 +35,15 @@ The menu bar item shows:
   `↑N` ahead · `↓N` behind · `●` working-tree changes · `⚑N` stashes ·
   `detached` · `⚠` fetch failed · `✓` clean.
 
+**Hover a repo** for a detail card. What the app already knows appears at
+once (branch → upstream, commits to push/pull, working-tree state, stashes, when
+it was last fetched, and the full fetch error if any). It then asks the server
+for `GET /repos/{id}/details` — a scan of just that repo — and fills in the last
+commit, the remote URL, the changed files `git status`-style (`M`/`A`/`D`/`R`/`?`
+grouped as Staged / Not staged / Untracked / Conflicted) and stash messages. The
+card only opens after a short rest on a row, and details are cached for 10 s, so
+sweeping the pointer across the list costs nothing.
+
 A switch in the panel header chooses what's listed: **Issues** (only repos that
 need attention — the default) or **All** (every tracked repo, handy as a quick
 launcher). The choice is remembered across launches. Long lists scroll.
@@ -86,4 +95,5 @@ button that runs `launchctl kickstart` on the LaunchAgent.
 | `Models.swift` | `Codable` mirrors of the server's `RepoStatus` / `Summary` |
 | `MenuContent.swift` | the dropdown panel, repo rows, and footer controls |
 | `TerminalLauncher.swift` | opens Terminal at a repo path |
+| `RepoHoverCard.swift` | the hover card: instant info, then on-demand details |
 | `LoginItem.swift` | `SMAppService` "Start at login" wrapper + `launchctl` service start |
