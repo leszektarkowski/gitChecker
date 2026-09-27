@@ -95,6 +95,7 @@ app's **Restart** button does this).
 | `GET /healthz` | liveness check (`ok`) |
 | `GET /repos` | all tracked repos with current status (JSON array) |
 | `GET /repos/{id}` | one repo by id (`id` is a stable hash of its path) |
+| `GET /repos/{id}/details` | on-demand detail for one repo: changed files by category (staged / not staged / untracked / conflicted, 15 per category + totals), last commit, remote URL, stash messages. Scans just that repo; nothing is stored |
 | `GET /summary` | aggregate counts across all repos (cheap; for badges/prompts) |
 | `GET /config` | client-relevant config (currently `open_command`) |
 | `POST /scan` | trigger a discovery scan now (async, returns `202`) |

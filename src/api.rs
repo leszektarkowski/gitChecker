@@ -26,6 +26,7 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/repos", get(list_repos))
         .route("/repos/{id}", get(get_repo))
+        .route("/repos/{id}/details", get(get_repo_details))
         .route("/summary", get(summary))
         .route("/config", get(get_config))
         .route("/scan", post(trigger_scan))
@@ -52,6 +53,22 @@ async fn list_repos(State(state): State<AppState>) -> Result<impl IntoResponse, 
 async fn summary(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
     let repos = state.db.list_statuses()?;
     Ok(Json(Summary::from_statuses(&repos)))
+}
+
+/// On-demand detail for one repo (hover card). Runs a status scan of just that
+/// repo on the blocking pool; nothing is stored.
+async fn get_repo_details(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, ApiError> {
+    let Some(status) = state.db.get_status(&id)? else {
+        return Err(ApiError::NotFound);
+    };
+    let path = status.path;
+    let details = tokio::task::spawn_blocking(move || crate::status::compute_details(&path))
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::Error::new(e)))?;
+    Ok(Json(details))
 }
 
 async fn get_repo(

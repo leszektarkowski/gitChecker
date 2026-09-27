@@ -178,3 +178,71 @@ impl Summary {
         s
     }
 }
+
+/// Max files listed per category in `RepoDetails` (the total is still reported).
+pub const DETAIL_CAP: usize = 15;
+
+/// One changed file, e.g. `{"path": "src/main.rs", "kind": "modified"}`.
+#[derive(Debug, Clone, Serialize)]
+pub struct FileChange {
+    pub path: String,
+    pub kind: &'static str,
+}
+
+/// A category of changes: the full count plus the first `DETAIL_CAP` entries.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct FileGroup {
+    pub total: usize,
+    pub files: Vec<FileChange>,
+}
+
+impl FileGroup {
+    pub fn push(&mut self, path: String, kind: &'static str) {
+        self.total += 1;
+        if self.files.len() < DETAIL_CAP {
+            self.files.push(FileChange { path, kind });
+        }
+    }
+}
+
+/// The commit HEAD points at.
+#[derive(Debug, Clone, Serialize)]
+pub struct CommitInfo {
+    pub summary: String,
+    pub author: String,
+    /// Unix seconds (commit time).
+    pub time: i64,
+}
+
+/// On-demand detail for one repo (the hover card). Computed per request and
+/// never stored, so it adds no work to the background checks.
+#[derive(Debug, Clone, Serialize)]
+pub struct RepoDetails {
+    pub id: String,
+    pub path: PathBuf,
+    pub staged: FileGroup,
+    pub unstaged: FileGroup,
+    pub untracked: FileGroup,
+    pub conflicted: FileGroup,
+    pub last_commit: Option<CommitInfo>,
+    pub remote_url: Option<String>,
+    pub stashes: Vec<String>,
+    pub error: Option<String>,
+}
+
+impl RepoDetails {
+    pub fn new(path: PathBuf) -> Self {
+        RepoDetails {
+            id: repo_id(&path),
+            path,
+            staged: FileGroup::default(),
+            unstaged: FileGroup::default(),
+            untracked: FileGroup::default(),
+            conflicted: FileGroup::default(),
+            last_commit: None,
+            remote_url: None,
+            stashes: Vec::new(),
+            error: None,
+        }
+    }
+}
