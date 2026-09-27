@@ -50,7 +50,7 @@ struct MenuContent: View {
             ))
             .toggleStyle(.checkbox)
             .font(.caption)
-            .disabled(login.note == "run the packaged .app to enable")
+            .disabled(!login.canToggle)
             Spacer()
             // Open config.toml in the default text editor.
             Button("Configure…") { ConfigFile.openInEditor() }
