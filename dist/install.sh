@@ -31,6 +31,12 @@ sed -e "s|__BIN__|$BIN_DST|g" -e "s|__LOG__|$LOG|g" \
 echo "==> (Re)loading the service via launchctl"
 # Stop any previous instance of the agent, then load fresh. Ignore "not loaded".
 launchctl bootout "gui/$UID_NUM/$LABEL" 2>/dev/null || true
+# bootout returns before the old job is fully torn down; bootstrapping too early
+# fails with "Bootstrap failed: 5: Input/output error". Wait until it's gone.
+for _ in $(seq 1 20); do
+    launchctl print "gui/$UID_NUM/$LABEL" >/dev/null 2>&1 || break
+    sleep 0.5
+done
 launchctl bootstrap "gui/$UID_NUM" "$PLIST_DST"
 launchctl kickstart -k "gui/$UID_NUM/$LABEL"
 
@@ -48,16 +54,27 @@ echo "==> Building the menu bar app…"
 "$REPO/clients/menubar/package-app.sh"
 
 APP_SRC="$REPO/clients/menubar/build/GitCheckerBar.app"
-if cp -R "$APP_SRC" /Applications/ 2>/dev/null; then
-    APP_DST="/Applications/GitCheckerBar.app"
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+
+# Quit any running copy first: open(1) on an already-running app just
+# re-activates the old process instead of launching the new build.
+pkill -x GitCheckerBar 2>/dev/null || true
+
+if [ -w /Applications ]; then
+    APP_DIR=/Applications
 else
-    mkdir -p "$HOME/Applications"
-    cp -R "$APP_SRC" "$HOME/Applications/"
-    APP_DST="$HOME/Applications/GitCheckerBar.app"
+    APP_DIR="$HOME/Applications"; mkdir -p "$APP_DIR"
 fi
-# Replace an existing copy cleanly.
+APP_DST="$APP_DIR/GitCheckerBar.app"
 rm -rf "$APP_DST"
-cp -R "$APP_SRC" "$(dirname "$APP_DST")/"
+ditto "$APP_SRC" "$APP_DST"   # ditto preserves the code signature/xattrs
+
+# Leave exactly ONE bundle with this identifier. Otherwise the build output is
+# also registered with LaunchServices, and a login launch (which resolves the
+# app by bundle ID) can start that copy instead of the installed one.
+"$LSREGISTER" -u "$APP_SRC" 2>/dev/null || true
+rm -rf "$APP_SRC"
+"$LSREGISTER" -f "$APP_DST" 2>/dev/null || true
 echo "==> Installed app → $APP_DST"
 
 open "$APP_DST"
