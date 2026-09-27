@@ -37,9 +37,12 @@ final class AppModel {
 
     /// Repos worth showing, attention-first then alphabetical.
     var attentionRepos: [RepoStatus] {
-        repos
-            .filter { $0.needsAttention || $0.behind > 0 || $0.lastFetchError != nil || $0.error != nil }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        allRepos.filter { $0.needsAttention || $0.behind > 0 || $0.lastFetchError != nil || $0.error != nil }
+    }
+
+    /// Every tracked repo, alphabetical (the panel's "All" view).
+    var allRepos: [RepoStatus] {
+        repos.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     /// Headline badge count for the menu bar.

@@ -5,6 +5,15 @@ import SwiftUI
 struct MenuContent: View {
     @Bindable var model: AppModel
     @State private var login = LoginItem()
+    /// Show every tracked repo instead of only those needing attention.
+    /// Remembered across launches.
+    @AppStorage("showAllRepos") private var showAll = false
+    /// Measured height of the list's content, so the scroll area is exactly as
+    /// tall as the rows (no per-row estimate) up to `maxListHeight`.
+    @State private var listContentHeight: CGFloat = 0
+    /// ~11.5 rows: deliberately not a whole number of rows, so a half-visible
+    /// last row hints that the list scrolls (macOS hides idle scrollbars).
+    private let maxListHeight: CGFloat = 460
 
     /// Fixed panel width. The inner content is pinned to `width - 2*padding` so a
     /// vertical ScrollView can't collapse its width when scrolling activates.
@@ -20,8 +29,8 @@ struct MenuContent: View {
 
             if let err = model.connectionError {
                 offline(err)
-            } else if model.attentionRepos.isEmpty {
-                allClear
+            } else if shownRepos.isEmpty {
+                if showAll { noRepos } else { allClear }
             } else {
                 repoList
             }
@@ -68,33 +77,43 @@ struct MenuContent: View {
             Image(systemName: "arrow.triangle.branch")
             Text("gitchecker").font(.headline)
             Spacer()
-            Text("\(model.summary.total) tracked")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Picker("Show", selection: $showAll) {
+                Text("Issues \(model.attentionRepos.count)").tag(false)
+                Text("All \(model.summary.total)").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            .fixedSize()
         }
     }
 
-    /// Cap the visible rows so a long list can't make an oversized panel. A
-    /// plain VStack (no ScrollView) lets the popover window size itself exactly
-    /// to the content — a ScrollView with a fixed frame height leaves the window
-    /// stuck at its largest size, showing empty margins when the list shrinks.
-    private let maxVisibleRepos = 12
+    private var shownRepos: [RepoStatus] {
+        showAll ? model.allRepos : model.attentionRepos
+    }
 
+    /// The list scrolls once it's taller than `maxListHeight`. The scroll area
+    /// is sized to the measured content height, and the popover (unlike the old
+    /// MenuBarExtra window) resizes to follow it, shrinking included.
     private var repoList: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(model.attentionRepos.prefix(maxVisibleRepos))) { repo in
-                RepoRow(repo: repo) { RepoOpener.open(command: model.openCommand, path: repo.path) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(shownRepos) { repo in
+                    RepoRow(repo: repo) { RepoOpener.open(command: model.openCommand, path: repo.path) }
+                }
             }
-            let extra = model.attentionRepos.count - maxVisibleRepos
-            if extra > 0 {
-                Text("+\(extra) more…")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-            }
+            .frame(width: contentWidth, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listContentHeight = $0 }
         }
-        .frame(width: contentWidth, alignment: .leading)
+        .frame(height: min(listContentHeight, maxListHeight))
+    }
+
+    private var noRepos: some View {
+        HStack {
+            Image(systemName: "tray").foregroundStyle(.secondary)
+            Text("No repositories tracked yet — try Rescan").font(.callout)
+        }
+        .padding(.vertical, 6)
     }
 
     private var allClear: some View {
@@ -173,9 +192,14 @@ private struct RepoRow: View {
                     }
                 }
                 Spacer()
-                Text(repo.badges.joined(separator: " "))
-                    .font(.caption.monospaced())
-                    .foregroundStyle(repo.lastFetchError != nil || repo.error != nil ? .orange : .primary)
+                if repo.badges.isEmpty {
+                    // Clean (only visible in the "All" view).
+                    Text("✓").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text(repo.badges.joined(separator: " "))
+                        .font(.caption.monospaced())
+                        .foregroundStyle(repo.lastFetchError != nil || repo.error != nil ? .orange : .primary)
+                }
             }
             .padding(.vertical, 4)
             .padding(.horizontal, 6)

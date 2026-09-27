@@ -33,7 +33,11 @@ The menu bar item shows:
 - a ⚠ icon with the **attention count** when repos need it, or a ✓ when all clean;
 - a click-through panel listing repos with compact badges:
   `↑N` ahead · `↓N` behind · `●` working-tree changes · `⚑N` stashes ·
-  `detached` · `⚠` fetch failed.
+  `detached` · `⚠` fetch failed · `✓` clean.
+
+A switch in the panel header chooses what's listed: **Issues** (only repos that
+need attention — the default) or **All** (every tracked repo, handy as a quick
+launcher). The choice is remembered across launches. Long lists scroll.
 
 **Clicking a repo runs the configured `open_command`** with `{path}` set to the
 repo's folder (from the server config; defaults to opening Terminal). Set it to
