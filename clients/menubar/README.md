@@ -5,7 +5,7 @@ need attention and lets you jump straight into any of them.
 
 ## Requirements
 
-- macOS 14+ (uses `MenuBarExtra` + the Observation framework)
+- macOS 14+ (SwiftUI + the Observation framework, hosted in an AppKit popover)
 - The gitchecker service running locally (default `http://127.0.0.1:7878`)
 
 ## Run
@@ -71,7 +71,7 @@ button that runs `launchctl kickstart` on the LaunchAgent.
 
 | File | Role |
 |------|------|
-| `GitCheckerBarApp.swift` | `@main` app; `MenuBarExtra` + accessory activation (no Dock icon) |
+| `GitCheckerBarApp.swift` | `@main` app; an `NSStatusItem` + `NSPopover` hosting `MenuContent`, accessory activation (no Dock icon). The popover delegate reports open/close for the polling |
 | `AppModel.swift` | `@Observable` state; polls the API via `URLSession` |
 | `Models.swift` | `Codable` mirrors of the server's `RepoStatus` / `Summary` |
 | `MenuContent.swift` | the dropdown panel, repo rows, and footer controls |

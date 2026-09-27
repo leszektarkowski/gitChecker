@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The panel shown when the menu bar item is clicked (window style).
+/// The panel shown in the popover when the menu bar item is clicked.
+/// Open/close is reported by the popover delegate (see AppDelegate).
 struct MenuContent: View {
     @Bindable var model: AppModel
     @State private var login = LoginItem()
@@ -36,13 +37,9 @@ struct MenuContent: View {
         }
         .padding(pad)
         .frame(width: width)
-        // Report the exact ideal height so the popover window fits the content
-        // tightly (avoids the over-tall window / empty top+bottom margins).
+        // Report the exact ideal height; the popover sizes itself to it
+        // (NSHostingController .preferredContentSize), shrinking included.
         .fixedSize(horizontal: false, vertical: true)
-        // Best-effort panel open/close detection: fetch fresh on open, idle on
-        // close. Falls back gracefully if these don't fire per-toggle.
-        .onAppear { model.panelOpened() }
-        .onDisappear { model.panelClosed() }
     }
 
     private var loginRow: some View {
