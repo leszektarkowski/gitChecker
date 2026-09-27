@@ -73,13 +73,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 }
 
+/// Plain AppKit entry point. The app has no SwiftUI *scenes* — only a SwiftUI
+/// view hosted in the popover — so we skip the SwiftUI App lifecycle, which
+/// would require a placeholder scene (a `Settings` scene opens a blank window
+/// at launch on recent macOS).
 @main
-struct GitCheckerBarApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-
-    // Everything lives in the status item / popover owned by the delegate; the
-    // app needs at least one scene, and Settings shows nothing until invoked.
-    var body: some Scene {
-        Settings { EmptyView() }
+enum GitCheckerBarMain {
+    @MainActor
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()   // NSApplication holds its delegate weakly;
+        app.delegate = delegate        // this local lives for the whole run loop.
+        app.run()
     }
 }
