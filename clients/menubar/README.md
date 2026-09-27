@@ -64,6 +64,11 @@ The footer has:
   `/healthz`; if it doesn't — usually a malformed config — it warns you to check
   the file and the log instead of silently crash-looping.
 
+Only one copy runs at a time, however it's launched (Finder, `open -n`, the
+login item, the raw binary, a dev build) — launching it again just opens the
+running copy's panel. To run a dev build (`swift run`), quit the installed app
+first.
+
 If the service isn't running it shows "service not running" with a **Start**
 button that runs `launchctl kickstart` on the LaunchAgent.
 
@@ -71,7 +76,8 @@ button that runs `launchctl kickstart` on the LaunchAgent.
 
 | File | Role |
 |------|------|
-| `GitCheckerBarApp.swift` | `@main` app; an `NSStatusItem` + `NSPopover` hosting `MenuContent`, accessory activation (no Dock icon). The popover delegate reports open/close for the polling |
+| `GitCheckerBarApp.swift` | AppKit `@main` entry; an `NSStatusItem` + `NSPopover` hosting `MenuContent`, accessory activation (no Dock icon). The popover delegate reports open/close for the polling |
+| `SingleInstance.swift` | one running copy only: an `flock` on a file in Application Support; a second launch asks the running copy to show its panel, then quits |
 | `AppModel.swift` | `@Observable` state; polls the API via `URLSession` |
 | `Models.swift` | `Codable` mirrors of the server's `RepoStatus` / `Summary` |
 | `MenuContent.swift` | the dropdown panel, repo rows, and footer controls |

@@ -19,6 +19,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     let popover = NSPopover()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Single-instance: if another copy is already running, hand over to it
+        // (it shows its panel) and quit before creating a second menu bar item.
+        guard SingleInstance.acquire() else {
+            SingleInstance.signalRunningInstance()
+            NSApp.terminate(nil)
+            return
+        }
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(showPopoverFromNotification),
+            name: SingleInstance.showNotification, object: nil)
+
         Self.shared = self
         NSApp.setActivationPolicy(.accessory)
 
@@ -52,6 +63,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             NSApp.activate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+
+    /// Another launch was refused; show our panel so the user sees we're running.
+    @objc private func showPopoverFromNotification(_ notification: Notification) {
+        if !popover.isShown { togglePopover(nil) }
     }
 
     func popoverWillShow(_ notification: Notification) { AppModel.shared.panelOpened() }
