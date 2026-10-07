@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::db::Db;
 use crate::status::{compute_status, now_unix};
 use anyhow::Result;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{Notify, Semaphore};
 use tokio::task::JoinSet;
@@ -132,14 +133,14 @@ async fn check_loop(db: Db, cfg: Arc<Config>, check_notify: Arc<Notify>) {
 /// periodic loop and the synchronous `POST /check` endpoint, so a manual refresh
 /// returns only once the on-disk state has actually been re-inspected.
 pub async fn check_all(db: &Db) {
-    let paths = match db.list_paths() {
-        Ok(p) => p,
-        Err(e) => {
-            tracing::warn!(error = %e, "could not list repos for check");
-            return;
-        }
-    };
+    match db.list_paths() {
+        Ok(paths) => check_paths(db, paths).await,
+        Err(e) => tracing::warn!(error = %e, "could not list repos for check"),
+    }
+}
 
+/// Recompute and persist local status for the given repos (bounded concurrency).
+pub async fn check_paths(db: &Db, paths: Vec<PathBuf>) {
     let sem = Arc::new(Semaphore::new(CONCURRENCY));
     let mut set = JoinSet::new();
     for path in paths {
@@ -163,7 +164,7 @@ pub async fn check_all(db: &Db) {
 }
 
 /// Fetch loop: refresh remote-tracking refs so the next check sees fresh
-/// `behind` counts. Each fetch is bounded by a timeout.
+/// `behind` counts.
 async fn fetch_loop(
     db: Db,
     cfg: Arc<Config>,
@@ -185,40 +186,58 @@ async fn fetch_loop(
             }
         };
         tracing::debug!(candidates = paths.len(), "fetch cycle");
-        let base = cfg.fetch_interval_secs as i64;
-        let cap = fetch::FETCH_BACKOFF_CAP.as_secs() as i64;
-
-        let sem = Arc::new(Semaphore::new(CONCURRENCY));
-        let mut set = JoinSet::new();
-        for path in paths {
-            let permit = sem.clone().acquire_owned().await.unwrap();
-            let db = db.clone();
-            set.spawn(async move {
-                let _permit = permit;
-                let p = path.clone();
-                let res = timeout(
-                    fetch::FETCH_TIMEOUT,
-                    tokio::task::spawn_blocking(move || fetch::fetch_repo(&p)),
-                )
-                .await;
-                match res {
-                    Ok(Ok(Ok(()))) => {
-                        let _ = db.set_last_fetched(&path, now_unix());
-                    }
-                    Ok(Ok(Err(msg))) => {
-                        tracing::debug!(repo = %path.display(), error = %msg, "fetch failed");
-                        let _ = db.record_fetch_failure(&path, &msg, base, cap);
-                    }
-                    Ok(Err(e)) => tracing::warn!(error = %e, "fetch task panicked"),
-                    Err(_) => {
-                        tracing::debug!(repo = %path.display(), "fetch timed out");
-                        let _ = db.record_fetch_failure(&path, "fetch timed out", base, cap);
-                    }
-                }
-            });
-        }
-        while set.join_next().await.is_some() {}
+        fetch_paths(&db, &cfg, paths).await;
         // Recompute status now that remote refs may have advanced.
         check_notify.notify_one();
     }
+}
+
+/// Fetch the given repos (bounded concurrency, each with a timeout). Success
+/// clears the error and resets backoff; failure records it and backs off.
+/// Shared by the fetch loop and the manual `POST /fetch/retry`.
+/// Returns (succeeded, failed).
+pub async fn fetch_paths(db: &Db, cfg: &Config, paths: Vec<PathBuf>) -> (usize, usize) {
+    let base = cfg.fetch_interval_secs as i64;
+    let cap = fetch::FETCH_BACKOFF_CAP.as_secs() as i64;
+
+    let sem = Arc::new(Semaphore::new(CONCURRENCY));
+    let mut set = JoinSet::new();
+    for path in paths {
+        let permit = sem.clone().acquire_owned().await.unwrap();
+        let db = db.clone();
+        set.spawn(async move {
+            let _permit = permit;
+            let p = path.clone();
+            let res = timeout(
+                fetch::FETCH_TIMEOUT,
+                tokio::task::spawn_blocking(move || fetch::fetch_repo(&p)),
+            )
+            .await;
+            match res {
+                Ok(Ok(Ok(()))) => {
+                    let _ = db.set_last_fetched(&path, now_unix());
+                    true
+                }
+                Ok(Ok(Err(msg))) => {
+                    tracing::debug!(repo = %path.display(), error = %msg, "fetch failed");
+                    let _ = db.record_fetch_failure(&path, &msg, base, cap);
+                    false
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!(error = %e, "fetch task panicked");
+                    false
+                }
+                Err(_) => {
+                    tracing::debug!(repo = %path.display(), "fetch timed out");
+                    let _ = db.record_fetch_failure(&path, "fetch timed out", base, cap);
+                    false
+                }
+            }
+        });
+    }
+    let (mut ok, mut failed) = (0, 0);
+    while let Some(res) = set.join_next().await {
+        if matches!(res, Ok(true)) { ok += 1 } else { failed += 1 }
+    }
+    (ok, failed)
 }

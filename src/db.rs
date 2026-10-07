@@ -194,6 +194,18 @@ impl Db {
         Ok(rows.into_iter().map(PathBuf::from).collect())
     }
 
+    /// Repos whose last fetch failed, regardless of backoff (manual retry).
+    pub fn list_failed_fetches(&self) -> Result<Vec<PathBuf>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT path FROM repos WHERE last_fetch_error IS NOT NULL ORDER BY path",
+        )?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows.into_iter().map(PathBuf::from).collect())
+    }
+
     /// Repos due for a fetch: not currently backing off after failures.
     pub fn list_fetch_candidates(&self, now: i64) -> Result<Vec<PathBuf>> {
         let conn = self.lock();

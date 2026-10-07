@@ -108,3 +108,10 @@ struct RepoDetails: Decodable {
     let stashes: [String]
     let error: String?
 }
+
+/// Result of `POST /fetch/retry`.
+struct FetchRetryResult: Decodable {
+    let retried: Int
+    let succeeded: Int
+    let failed: Int
+}

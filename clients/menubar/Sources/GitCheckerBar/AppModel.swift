@@ -17,6 +17,11 @@ final class AppModel {
     private(set) var isScanning = false
     /// True while restarting the service (after a config edit).
     private(set) var isRestarting = false
+    /// True while a manual "retry failed fetches" is running.
+    private(set) var isRetryingFetch = false
+    /// Short outcome of the last manual retry ("1 of 3 recovered"), shown for a
+    /// few seconds so a retry that changes nothing still visibly did something.
+    private(set) var retryMessage: String?
 
     /// Whether the panel is currently visible. Drives how hard we poll.
     private(set) var isPanelOpen = false
@@ -129,6 +134,36 @@ final class AppModel {
         guard let fresh: RepoDetails = try? await get("repos/\(id)/details") else { return nil }
         detailsCache[id] = (Date(), fresh)
         return fresh
+    }
+
+    /// Re-fetch every repo whose last fetch failed, ignoring the server's
+    /// backoff timer, then reload. The server call is synchronous.
+    func retryFailedFetches() async {
+        isRetryingFetch = true
+        var req = URLRequest(url: base.appendingPathComponent("fetch/retry"))
+        req.httpMethod = "POST"
+        req.timeoutInterval = 120 // several fetches, each up to 30 s
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            let r = try JSONDecoder().decode(FetchRetryResult.self, from: data)
+            retryMessage = r.retried == 0 ? "Nothing to retry"
+                : r.failed == 0 ? (r.succeeded == 1 ? "Recovered" : "All \(r.succeeded) recovered")
+                : "\(r.succeeded) of \(r.retried) recovered"
+        } catch {
+            retryMessage = "Retry failed: \(friendlyError(error))"
+        }
+        detailsCache.removeAll() // fetch results change what the hover card shows
+        await reload(trigger: nil, includeList: isPanelOpen)
+        isRetryingFetch = false
+
+        let shown = retryMessage
+        Task {
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            if retryMessage == shown { retryMessage = nil }
+        }
     }
 
     /// Re-inspect known repos server-side (if `forceCheck`), then reload. This is

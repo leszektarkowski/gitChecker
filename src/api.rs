@@ -31,6 +31,7 @@ pub fn router(state: AppState) -> Router {
         .route("/config", get(get_config))
         .route("/scan", post(trigger_scan))
         .route("/check", post(trigger_check))
+        .route("/fetch/retry", post(retry_failed_fetches))
         .with_state(state)
 }
 
@@ -98,6 +99,21 @@ async fn trigger_scan(State(state): State<AppState>) -> StatusCode {
 async fn trigger_check(State(state): State<AppState>) -> StatusCode {
     crate::check_all(&state.db).await;
     StatusCode::OK
+}
+
+/// Manually retry every repo whose last fetch failed, ignoring the backoff
+/// timer, then re-check those repos so `behind` / errors update immediately.
+/// Synchronous: returns once done with `{retried, succeeded, failed}`.
+async fn retry_failed_fetches(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let paths = state.db.list_failed_fetches()?;
+    let (succeeded, failed) = crate::fetch_paths(&state.db, &state.cfg, paths.clone()).await;
+    crate::check_paths(&state.db, paths).await;
+    tracing::info!(succeeded, failed, "manual fetch retry");
+    Ok(Json(serde_json::json!({
+        "retried": succeeded + failed,
+        "succeeded": succeeded,
+        "failed": failed,
+    })))
 }
 
 /// Minimal error type mapping internal failures to HTTP responses.

@@ -35,6 +35,11 @@ struct MenuContent: View {
                 repoList
             }
 
+            if model.connectionError == nil,
+               model.summary.fetchErrors > 0 || model.isRetryingFetch || model.retryMessage != nil {
+                fetchRetryRow
+            }
+
             Divider()
             loginRow
             if let note = login.note {
@@ -129,6 +134,32 @@ struct MenuContent: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listContentHeight = $0 }
         }
         .frame(height: min(listContentHeight, maxListHeight))
+    }
+
+    /// "⚠ 2 fetches failed · Retry" — re-fetches failed repos now, ignoring the
+    /// backoff timer. Shown in both views: a repo can have a fetch error *and*
+    /// be at risk, so it isn't always in the "Behind or unreachable" section.
+    private var fetchRetryRow: some View {
+        let failed = model.summary.fetchErrors
+        return HStack(spacing: 6) {
+            if model.isRetryingFetch {
+                ProgressView().controlSize(.small)
+                Text("Retrying failed fetches…").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Image(systemName: failed > 0 ? "exclamationmark.icloud" : "checkmark.icloud")
+                    .foregroundStyle(failed > 0 ? .orange : .green)
+                Text(model.retryMessage ?? (failed == 1 ? "1 fetch failed" : "\(failed) fetches failed"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            // Same font and colour as the other buttons: a small grey button
+            // reads as disabled.
+            Button("Retry") { Task { await model.retryFailedFetches() } }
+                .buttonStyle(.borderless)
+                .disabled(model.isRetryingFetch || failed == 0)
+        }
+        .padding(.horizontal, 6)
     }
 
     @ViewBuilder private func rows(_ repos: [RepoStatus]) -> some View {

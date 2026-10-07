@@ -56,6 +56,11 @@ A switch in the panel header chooses what's listed:
 
 The choice is remembered across launches. Long lists scroll.
 
+When some fetches have failed, a row under the list says so (**⚠ 2 fetches
+failed**) with a **Retry** button: it re-fetches those repos immediately instead
+of waiting out the backoff timer, then reports the outcome ("1 of 3 recovered").
+Handy after a network blip or once you've fixed credentials.
+
 **Clicking a repo runs the configured `open_command`** with `{path}` set to the
 repo's folder (from the server config; defaults to opening Terminal). Set it to
 e.g. `smerge {path}` for Sublime Merge — see the top-level README.

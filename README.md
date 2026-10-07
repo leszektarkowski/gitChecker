@@ -100,6 +100,7 @@ app's **Restart** button does this).
 | `GET /config` | client-relevant config (currently `open_command`) |
 | `POST /scan` | trigger a discovery scan now (async, returns `202`) |
 | `POST /check` | re-inspect all repos **synchronously**; returns `200` once done, so a follow-up `GET /repos` reflects current on-disk state |
+| `POST /fetch/retry` | re-fetch every repo whose last fetch failed **now**, ignoring the backoff timer, then re-check them; synchronous, returns `{retried, succeeded, failed}` |
 
 ```sh
 curl -s localhost:7878/repos | jq
