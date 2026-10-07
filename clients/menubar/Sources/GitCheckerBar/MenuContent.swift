@@ -19,6 +19,8 @@ struct MenuContent: View {
     /// vertical ScrollView can't collapse its width when scrolling activates.
     private let width: CGFloat = 340
     private let pad: CGFloat = 10
+    // Inside `pad`, every row is inset 6 pt so text lines up with the repo rows
+    // and hover highlights (rows and buttons) stay within the dividers.
     private var contentWidth: CGFloat { width - 2 * pad }
 
     var body: some View {
@@ -46,6 +48,7 @@ struct MenuContent: View {
                 Text(note)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .padding(.leading, 6)
             }
             footer
         }
@@ -57,7 +60,7 @@ struct MenuContent: View {
     }
 
     private var loginRow: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 2) {
             Toggle("Start at login", isOn: Binding(
                 get: { login.isEnabled },
                 set: { login.setEnabled($0) }
@@ -68,13 +71,15 @@ struct MenuContent: View {
             Spacer()
             // Open config.toml in the default text editor.
             Button("Configure…") { ConfigFile.openInEditor() }
-                .buttonStyle(.borderless)
+                .buttonStyle(.hover)
                 .disabled(model.isRestarting)
             // Apply edits: restart the service (it reads config only at startup).
             Button("Restart") { Task { await model.restartService() } }
-                .buttonStyle(.borderless)
+                .buttonStyle(.hover)
                 .disabled(model.isRestarting)
         }
+        // Buttons carry their own 6 pt padding on the trailing side.
+        .padding(.leading, 6)
     }
 
     private var header: some View {
@@ -91,6 +96,7 @@ struct MenuContent: View {
             .controlSize(.small)
             .fixedSize()
         }
+        .padding(.horizontal, 6)
     }
 
     private var listIsEmpty: Bool {
@@ -156,10 +162,12 @@ struct MenuContent: View {
             // Same font and colour as the other buttons: a small grey button
             // reads as disabled.
             Button("Retry") { Task { await model.retryFailedFetches() } }
-                .buttonStyle(.borderless)
+                .buttonStyle(.hover)
                 .disabled(model.isRetryingFetch || failed == 0)
         }
-        .padding(.horizontal, 6)
+        // Leading only: the button's own padding supplies the trailing inset,
+        // lining "Retry" up with the badges in the repo rows.
+        .padding(.leading, 6)
     }
 
     @ViewBuilder private func rows(_ repos: [RepoStatus]) -> some View {
@@ -174,6 +182,7 @@ struct MenuContent: View {
             Text("No repositories tracked yet — try Rescan").font(.callout)
         }
         .padding(.vertical, 6)
+        .padding(.horizontal, 6)
     }
 
     private var allClear: some View {
@@ -182,6 +191,7 @@ struct MenuContent: View {
             Text("All clean — nothing needs attention").font(.callout)
         }
         .padding(.vertical, 6)
+        .padding(.horizontal, 6)
     }
 
     private func offline(_ message: String) -> some View {
@@ -197,28 +207,30 @@ struct MenuContent: View {
                     await model.refresh()
                 }
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.hover)
         }
         .padding(.vertical, 6)
+        .padding(.leading, 6)
     }
 
     private var footer: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 2) {
             Text(statusText)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Spacer()
             // Rescan = re-discover repo folders (find new / prune gone).
             Button("Rescan") { Task { await model.rescan() } }
-                .buttonStyle(.borderless)
+                .buttonStyle(.hover)
                 .disabled(model.isScanning || model.isRestarting)
             // Refresh = re-check status of known repos.
             Button("Refresh") { Task { await model.refresh() } }
-                .buttonStyle(.borderless)
+                .buttonStyle(.hover)
                 .disabled(model.isScanning || model.isRestarting)
             Button("Quit") { NSApplication.shared.terminate(nil) }
-                .buttonStyle(.borderless)
+                .buttonStyle(.hover)
         }
+        .padding(.leading, 6)
     }
 
     private var statusText: String {
@@ -270,7 +282,7 @@ private struct RepoRow: View {
             .padding(.vertical, 4)
             .padding(.horizontal, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? Color.secondary.opacity(0.15) : Color.clear)
+            .background(hovering ? Color.hoverHighlight : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .contentShape(Rectangle())
         }
