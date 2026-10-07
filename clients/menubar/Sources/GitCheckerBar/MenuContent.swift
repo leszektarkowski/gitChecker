@@ -29,7 +29,7 @@ struct MenuContent: View {
 
             if let err = model.connectionError {
                 offline(err)
-            } else if shownRepos.isEmpty {
+            } else if listIsEmpty {
                 if showAll { noRepos } else { allClear }
             } else {
                 repoList
@@ -78,7 +78,7 @@ struct MenuContent: View {
             Text("gitchecker").font(.headline)
             Spacer()
             Picker("Show", selection: $showAll) {
-                Text("Issues \(model.attentionRepos.count)").tag(false)
+                Text("Issues \(model.atRiskRepos.count)").tag(false)
                 Text("All \(model.summary.total)").tag(true)
             }
             .pickerStyle(.segmented)
@@ -88,8 +88,9 @@ struct MenuContent: View {
         }
     }
 
-    private var shownRepos: [RepoStatus] {
-        showAll ? model.allRepos : model.attentionRepos
+    private var listIsEmpty: Bool {
+        showAll ? model.allRepos.isEmpty
+                : model.atRiskRepos.isEmpty && model.behindOrUnreachableRepos.isEmpty
     }
 
     /// The list scrolls once it's taller than `maxListHeight`. The scroll area
@@ -98,14 +99,42 @@ struct MenuContent: View {
     private var repoList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
-                ForEach(shownRepos) { repo in
-                    RepoRow(repo: repo, model: model) { RepoOpener.open(command: model.openCommand, path: repo.path) }
+                if showAll {
+                    rows(model.allRepos)
+                } else {
+                    // Issues: at-risk repos (what the badge counts) first…
+                    if model.atRiskRepos.isEmpty {
+                        Label("Nothing at risk — no uncommitted or unpushed work",
+                              systemImage: "checkmark.circle.fill")
+                            .font(.callout)
+                            .foregroundStyle(.green)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 6)
+                    } else {
+                        rows(model.atRiskRepos)
+                    }
+                    // …then the ones that only need a pull or couldn't be fetched.
+                    let rest = model.behindOrUnreachableRepos
+                    if !rest.isEmpty {
+                        Text("Behind or unreachable (\(rest.count))")
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                            .padding(.horizontal, 6)
+                        rows(rest)
+                    }
                 }
             }
             .frame(width: contentWidth, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listContentHeight = $0 }
         }
         .frame(height: min(listContentHeight, maxListHeight))
+    }
+
+    @ViewBuilder private func rows(_ repos: [RepoStatus]) -> some View {
+        ForEach(repos) { repo in
+            RepoRow(repo: repo, model: model) { RepoOpener.open(command: model.openCommand, path: repo.path) }
+        }
     }
 
     private var noRepos: some View {

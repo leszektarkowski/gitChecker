@@ -35,9 +35,18 @@ final class AppModel {
 
     private init() {}
 
-    /// Repos worth showing, attention-first then alphabetical.
-    var attentionRepos: [RepoStatus] {
-        allRepos.filter { $0.needsAttention || $0.behind > 0 || $0.lastFetchError != nil || $0.error != nil }
+    /// Local work at risk: uncommitted/unpushed changes, stashes, an interrupted
+    /// operation, or an unreadable repo. Same rule as the server's
+    /// `Summary.attention`, so the Issues tab always matches the menu bar badge.
+    var atRiskRepos: [RepoStatus] {
+        allRepos.filter { $0.needsAttention || $0.error != nil }
+    }
+
+    /// Not at risk, but worth a look: behind upstream (needs a pull) or the last
+    /// fetch failed. Shown in their own section, not counted in the badge, so a
+    /// network hiccup doesn't inflate the number.
+    var behindOrUnreachableRepos: [RepoStatus] {
+        allRepos.filter { !($0.needsAttention || $0.error != nil) && ($0.behind > 0 || $0.lastFetchError != nil) }
     }
 
     /// Every tracked repo, alphabetical (the panel's "All" view).

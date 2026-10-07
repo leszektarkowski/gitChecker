@@ -44,9 +44,17 @@ grouped as Staged / Not staged / Untracked / Conflicted) and stash messages. The
 card only opens after a short rest on a row, and details are cached for 10 s, so
 sweeping the pointer across the list costs nothing.
 
-A switch in the panel header chooses what's listed: **Issues** (only repos that
-need attention — the default) or **All** (every tracked repo, handy as a quick
-launcher). The choice is remembered across launches. Long lists scroll.
+A switch in the panel header chooses what's listed:
+
+- **Issues** (the default) — repos with local work at risk: uncommitted or
+  unpushed changes, stashes, an interrupted merge/rebase, or an unreadable repo.
+  This is exactly what the menu bar badge counts, so the two numbers always
+  match. Below them, a muted **Behind or unreachable** section lists repos that
+  only need a pull or whose last fetch failed — worth a look, but not counted in
+  the badge, so a network hiccup doesn't inflate it.
+- **All** — every tracked repo, handy as a quick launcher.
+
+The choice is remembered across launches. Long lists scroll.
 
 **Clicking a repo runs the configured `open_command`** with `{path}` set to the
 repo's folder (from the server config; defaults to opening Terminal). Set it to
